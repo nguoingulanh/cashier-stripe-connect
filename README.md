@@ -27,7 +27,7 @@ Cashier bills your *customers*. Cashier Connect pays your *sellers*: onboarding,
 
 | Package | PHP | Laravel | Cashier |
 |---------|-----|---------|---------|
-| 1.x     | 8.2+ | 11\*, 12, 13 | 15, 16 |
+| 0.x, 1.x | 8.2+ | 11\*, 12, 13 | 15, 16 |
 
 \* Laravel 11 no longer receives security fixes. It is still tested for existing applications, but upgrading is recommended.
 

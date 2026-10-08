@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-08
+
+First stable pre-1.0 release, so `composer require nguoingulanh/cashier-connect` works without a version constraint. Same features as 1.0.0-beta.1. The API may still change before 1.0.
+
 ## [1.0.0-beta.1] - 2026-10-08
 
 ### Added
@@ -22,5 +26,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Fixed
 - Syncing an unchanged account no longer fires `ConnectAccountUpdated` on MySQL (JSON key order).
 
-[Unreleased]: https://github.com/nguoingulanh/cashier-stripe-connect/compare/v1.0.0-beta.1...HEAD
+[Unreleased]: https://github.com/nguoingulanh/cashier-stripe-connect/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/nguoingulanh/cashier-stripe-connect/releases/tag/v0.1.0
 [1.0.0-beta.1]: https://github.com/nguoingulanh/cashier-stripe-connect/releases/tag/v1.0.0-beta.1
