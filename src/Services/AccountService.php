@@ -109,7 +109,10 @@ final class AccountService
 
         $account->fillFromStripe($stripeAccount);
 
-        $changes = array_keys(Arr::except($account->getDirty(), ['synced_at', 'updated_at']));
+        $changes = array_values(array_filter(
+            array_keys(Arr::except($account->getDirty(), ['synced_at', 'updated_at'])),
+            fn (string $key) => self::canonical($account->getOriginal($key)) !== self::canonical($account->getAttribute($key)),
+        ));
 
         $account->save();
 
@@ -219,6 +222,22 @@ final class AccountService
         }
 
         return $params;
+    }
+
+    /**
+     * Compare JSON attributes regardless of key order (MySQL reorders JSON keys).
+     */
+    private static function canonical(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return array_map(self::canonical(...), $value);
     }
 
     private function lockKey(Model $owner): string

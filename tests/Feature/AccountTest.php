@@ -102,7 +102,23 @@ it('fires ready exactly once when onboarding completes', function () {
         ->and($shop->connectRequirements()['currently_due'])->toBe([]);
 
     Event::assertDispatchedTimes(ConnectAccountReady::class, 1);
-    Event::assertDispatched(ConnectAccountUpdated::class, fn ($e) => $e->changes['charges_enabled'] === true);
+    // The second sync changes nothing, so only one Updated event is fired.
+    Event::assertDispatchedTimes(ConnectAccountUpdated::class, 1);
+    Event::assertDispatched(ConnectAccountUpdated::class, fn ($e) => ($e->changes['charges_enabled'] ?? null) === true);
+});
+
+it('does not report changes when stripe returns the same data in another key order', function () {
+    $shop = shop();
+    $account = $shop->createConnectAccount();
+    $shop->syncConnectAccount();
+
+    $requirements = $account->fresh()->requirements;
+    $this->stripe->setAccount($account->stripe_account_id, ['requirements' => array_reverse($requirements, true)]);
+    Event::fake();
+
+    $shop->syncConnectAccount();
+
+    Event::assertNotDispatched(ConnectAccountUpdated::class);
 });
 
 it('fires restricted when information is past due', function () {

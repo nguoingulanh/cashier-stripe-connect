@@ -31,6 +31,14 @@ abstract class TestCase extends Orchestra
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
+        // MySQL / PostgreSQL keep tables between tests, unlike in-memory SQLite.
+        Schema::dropIfExists('users');
+        Schema::dropIfExists('shops');
+        $this->beforeApplicationDestroyed(function () {
+            Schema::dropIfExists('users');
+            Schema::dropIfExists('shops');
+        });
+
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');

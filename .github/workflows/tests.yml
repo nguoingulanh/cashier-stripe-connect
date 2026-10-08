@@ -31,7 +31,7 @@ jobs:
             laravel: '13'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -41,6 +41,9 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # Every Laravel 11 release now has unpatched advisories (end of security support).
+          # Keep testing it for existing applications, without blocking the install.
+          if [ "${{ matrix.laravel }}" = "11" ]; then composer config audit.block-insecure false; fi
           composer require --dev "laravel/framework:^${{ matrix.laravel }}.0" "orchestra/testbench:^${{ matrix.testbench }}.0" --no-interaction --no-update
           composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
@@ -72,7 +75,7 @@ jobs:
         options: --health-cmd=pg_isready --health-interval=10s --health-timeout=5s --health-retries=5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -102,7 +105,7 @@ jobs:
         ports: ['12111:12111']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -122,10 +125,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        laravel: ['11', '12', '13']
+        # New Laravel 11 applications can no longer be created without security advisories.
+        laravel: ['12', '13']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: package
 

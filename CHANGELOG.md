@@ -16,3 +16,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - `connect.ready` middleware.
 - Artisan commands: `install`, `webhook`, `sync`, `doctor`, `prune`, `replay`.
 - `CashierConnect::fake()` with assertions for application tests.
+
+### Fixed
+- Syncing an unchanged account no longer fires `ConnectAccountUpdated` on MySQL (JSON key order).
