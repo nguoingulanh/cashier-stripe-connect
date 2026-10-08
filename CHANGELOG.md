@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.0.0-beta.1] - 2026-10-08
+
 ### Added
 - Connected accounts stored in a polymorphic table: create, sync, update, delete (Express, Standard, Custom or controller properties).
 - Hosted onboarding links with signed return / refresh routes, Express dashboard login links and Account Sessions for embedded components.
@@ -19,3 +21,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Fixed
 - Syncing an unchanged account no longer fires `ConnectAccountUpdated` on MySQL (JSON key order).
+
+[Unreleased]: https://github.com/nguoingulanh/cashier-stripe-connect/compare/v1.0.0-beta.1...HEAD
+[1.0.0-beta.1]: https://github.com/nguoingulanh/cashier-stripe-connect/releases/tag/v1.0.0-beta.1
