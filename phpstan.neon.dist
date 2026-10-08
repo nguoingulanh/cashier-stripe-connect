@@ -1,0 +1,17 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+        - routes
+        - tests/Fixtures/Shop.php
+        - tests/Fixtures/User.php
+    tmpDir: build/phpstan
+    ignoreErrors:
+        # The gateway forwards caller-built parameter arrays to stripe-php, whose
+        # PHPDoc declares exact array shapes for every endpoint.
+        -
+            identifier: argument.type
+            path: src/Gateway/CashierStripeGateway.php

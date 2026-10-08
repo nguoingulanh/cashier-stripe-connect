@@ -1,0 +1,165 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  schedule:
+    # Weekly: catch breaking changes in Laravel, Cashier or stripe-php early.
+    - cron: '0 3 * * 1'
+
+jobs:
+  tests:
+    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · ${{ matrix.stability }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+        laravel: ['11', '12', '13']
+        stability: [prefer-lowest, prefer-stable]
+        include:
+          - laravel: '11'
+            testbench: '9'
+          - laravel: '12'
+            testbench: '10'
+          - laravel: '13'
+            testbench: '11'
+        exclude:
+          - php: '8.2'
+            laravel: '13'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, json, mbstring, pdo_sqlite, bcmath, intl
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require --dev "laravel/framework:^${{ matrix.laravel }}.0" "orchestra/testbench:^${{ matrix.testbench }}.0" --no-interaction --no-update
+          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/pest --testsuite=Unit,Feature
+
+  databases:
+    name: ${{ matrix.db }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [mysql, pgsql]
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: testing
+        ports: ['3306:3306']
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+      pgsql:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testing
+        ports: ['5432:5432']
+        options: --health-cmd=pg_isready --health-interval=10s --health-timeout=5s --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, json, mbstring, pdo_mysql, pdo_pgsql, bcmath, intl
+          coverage: none
+
+      - run: composer update --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/pest --testsuite=Unit,Feature
+        env:
+          DB_CONNECTION: ${{ matrix.db }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ matrix.db == 'mysql' && '3306' || '5432' }}
+          DB_DATABASE: testing
+          DB_USERNAME: ${{ matrix.db == 'mysql' && 'root' || 'postgres' }}
+          DB_PASSWORD: password
+
+  contract:
+    name: Contract (stripe-mock)
+    runs-on: ubuntu-latest
+
+    services:
+      stripe-mock:
+        image: stripe/stripe-mock:latest
+        ports: ['12111:12111']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - run: composer update --prefer-dist --no-interaction
+
+      - name: Run contract tests
+        run: vendor/bin/pest --testsuite=Contract
+        env:
+          STRIPE_MOCK_URL: http://localhost:12111
+
+  install:
+    name: Install in fresh Laravel ${{ matrix.laravel }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        laravel: ['11', '12', '13']
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: package
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite
+          coverage: none
+
+      - name: Create a fresh Laravel application
+        run: composer create-project "laravel/laravel:^${{ matrix.laravel }}.0" app --no-interaction --prefer-dist
+
+      - name: composer require the package (no other setup)
+        working-directory: app
+        run: |
+          composer config repositories.package '{"type":"path","url":"../package","options":{"symlink":false}}'
+          composer require "nguoingulanh/cashier-connect:*@dev" --no-interaction
+
+      - name: Migrate and verify
+        working-directory: app
+        run: |
+          php artisan migrate --force
+          echo "STRIPE_SECRET=sk_test_dummy" >> .env
+          echo "STRIPE_CONNECT_WEBHOOK_SECRET=whsec_dummy" >> .env
+          php artisan cashier-connect:doctor --offline
+          php artisan route:list --path=stripe/connect
+
+      - name: Signed webhook over HTTP
+        working-directory: app
+        run: |
+          php artisan serve --port=8000 > /dev/null 2>&1 &
+          sleep 3
+          PAYLOAD='{"id":"evt_ci","object":"event","type":"account.updated","account":"acct_ci","livemode":false,"created":1,"data":{"object":{"id":"acct_ci","object":"account"}}}'
+          T=$(date +%s)
+          SIG=$(printf "%s.%s" "$T" "$PAYLOAD" | openssl dgst -sha256 -hmac whsec_dummy | awk '{print $NF}')
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8000/stripe/connect/webhook -H "Stripe-Signature: t=$T,v1=$SIG" -d "$PAYLOAD")" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8000/stripe/connect/webhook -H "Stripe-Signature: t=$T,v1=bad" -d "$PAYLOAD")" = "400"

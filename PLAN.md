@@ -7,7 +7,7 @@
 |---|---|
 | Package | `nguoingulanh/cashier-connect` |
 | Namespace | `Nguoingulanh\CashierConnect` |
-| Repo | `github.com/nguoingulanh/cashier-connect` |
+| Repo | `github.com/nguoingulanh/cashier-stripe-connect` |
 | PHP | 8.2+ |
 | Laravel | 11 / 12 / 13 |
 | Laravel Cashier | 15+ |
@@ -19,6 +19,31 @@
 - Hỗ trợ cả 3 mô hình thanh toán: **destination charge**, **direct charge**, **separate charges & transfers** (kèm subscription có chia phí).
 - Chủ sở hữu connected account là **polymorphic**: User, Shop, Vendor... đều được, và **không bắt buộc sửa bảng `users`**.
 - Mặc định mỗi model có 1 account. Bật `multiple_accounts` để cho phép nhiều account.
+
+---
+
+## Tiến độ (cập nhật 2026-10-08)
+
+| Phase | Trạng thái | Ghi chú |
+|---|---|---|
+| P0 – Nền móng | ✅ Xong | `composer.json`, Pest + Testbench, Pint, Larastan, GitHub Actions |
+| P1 – Account & Onboarding | ✅ Xong | |
+| P2 – Webhook | ✅ Xong | |
+| P3 – Thanh toán | ✅ Xong | |
+| P4 – Balance & Payout | ✅ Xong | |
+| P5 – DX | ✅ Xong | `install`, `doctor`, `sync`, `replay`, `prune`, `connect.ready`, `CashierConnect::fake()` |
+| P6 – Test & Hardening | 🟡 Một phần | Xong: 88 test Unit/Feature, 5 contract test với stripe-mock, install test trên app Laravel mới, chạy thử Laravel 11 (dependency thấp nhất) và 12. Chưa làm: E2E S1–S15 trên Stripe test mode (cần Stripe test key), load test S15, mutation test |
+| P7 – Docs & Release | 🟡 Một phần | Xong: README, CHANGELOG, LICENSE, SECURITY, CONTRIBUTING, workflow release. Chưa làm: push lên GitHub, đăng ký Packagist, gắn tag |
+
+### Điều chỉnh so với thiết kế ban đầu
+
+- **Gộp service:** `TransferService`, `PayoutService`, `BalanceService` và `RefundService` được gộp thành một `FundsService`. Mỗi phần chỉ vài dòng nên gộp lại dễ đọc hơn. Public API không đổi.
+- **Chưa tách `AccountDriver`:** `StripeGateway` đã là điểm thay thế duy nhất (bản thật và bản fake). Interface `AccountDriver` cho Accounts v2 sẽ thêm khi thật sự cần, và việc thêm không làm đổi public API.
+- **Larastan level 8 thay vì max:** level 9–10 bắt khai báo kiểu cho từng phần tử của payload webhook dạng mảng (khoảng 90 lỗi thuộc loại này), tốn công mà gần như không thêm an toàn thực tế. Sẽ nâng level sau.
+- **Thêm event:** `ConnectAccountDeleted`, `ConnectPayoutCanceled`.
+- **Event của platform:** `transfer.*` và `application_fee.*` phát sinh trên tài khoản platform, nên Stripe gửi chúng về webhook của Cashier, không về endpoint Connect. Package lắng nghe `Laravel\Cashier\Events\WebhookReceived` để chuyển chúng thành Connect event.
+- **Lọc live/test:** endpoint Connect ở chế độ live cũng nhận event test-mode từ connected account. Package bỏ qua các event khác chế độ với `STRIPE_SECRET`.
+- **`link_ttl` mặc định 1440 phút** (thay vì 60). Người bán có thể mất hơn 1 giờ để hoàn tất onboarding, và URL quay về đã được ký sẵn trong link onboarding. Nếu chữ ký hết hạn, người dùng được đưa về `return_url` chứ không bị lỗi 403.
 
 ---
 
@@ -567,7 +592,7 @@ Mục tiêu: bất kỳ ai cũng chạy được `composer require nguoingulanh/
 
 ### 8.1 Chuẩn bị repo GitHub
 
-- [ ] Tạo repo **public** `github.com/nguoingulanh/cashier-connect`, nhánh mặc định là `main`.
+- [ ] Tạo repo **public** `github.com/nguoingulanh/cashier-stripe-connect`, nhánh mặc định là `main`.
 - [ ] File bắt buộc hoặc nên có ở root:
 
 | File | Mục đích |
@@ -610,15 +635,15 @@ Bổ sung vào phần ở [mục 2.2](#22-composerjson-phần-chính):
   "name": "nguoingulanh/cashier-connect",
   "description": "Stripe Connect (onboarding, payouts, transfers, webhooks) for Laravel Cashier.",
   "keywords": ["laravel", "cashier", "stripe", "stripe-connect", "marketplace", "payouts", "billing"],
-  "homepage": "https://github.com/nguoingulanh/cashier-connect",
+  "homepage": "https://github.com/nguoingulanh/cashier-stripe-connect",
   "license": "MIT",
   "authors": [
     { "name": "nguoingulanh", "homepage": "https://github.com/nguoingulanh", "role": "Developer" }
   ],
   "support": {
-    "issues": "https://github.com/nguoingulanh/cashier-connect/issues",
-    "source": "https://github.com/nguoingulanh/cashier-connect",
-    "security": "https://github.com/nguoingulanh/cashier-connect/security/policy"
+    "issues": "https://github.com/nguoingulanh/cashier-stripe-connect/issues",
+    "source": "https://github.com/nguoingulanh/cashier-stripe-connect",
+    "security": "https://github.com/nguoingulanh/cashier-stripe-connect/security/policy"
   },
   "config": { "sort-packages": true, "allow-plugins": { "pestphp/pest-plugin": true, "infection/extension-installer": true } },
   "extra": {
@@ -660,7 +685,7 @@ git archive HEAD | tar -t             # xác nhận tests/, workbench/ không l�
 ### 8.4 Đăng ký trên Packagist (làm một lần)
 
 1. Đăng nhập [packagist.org](https://packagist.org) bằng tài khoản GitHub `nguoingulanh`.
-2. Vào **Submit**, dán URL `https://github.com/nguoingulanh/cashier-connect` rồi bấm **Check** và **Submit**.
+2. Vào **Submit**, dán URL `https://github.com/nguoingulanh/cashier-stripe-connect` rồi bấm **Check** và **Submit**.
 3. **Bật auto-update** để mỗi lần push tag là Packagist cập nhật ngay:
    - Đăng nhập Packagist bằng GitHub thì Packagist tự cài GitHub hook cho repo. Kiểm tra trên trang package: nếu **không** còn cảnh báo *"This package is not auto-updated"* là xong.
    - Nếu vẫn còn cảnh báo, thêm webhook thủ công trong GitHub repo → **Settings → Webhooks**:
